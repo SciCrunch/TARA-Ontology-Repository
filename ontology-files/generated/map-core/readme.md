@@ -1,6 +1,6 @@
 # TARA Acupoints Ontology Resource for MAP-CORE
 
-This directory contains code, SPARQL queries, and generated data based on the queries for MAP-CORE's use cases utilizing the [TARA Acupoints Ontology](https://github.com/SciCrunch/TARA-Ontology-Repository/blob/master/ontology-files/generated/readme.md).
+This directory contains the code, SPARQL queries, and generated data based on the query results for MAP-CORE's use cases utilizing the [TARA Acupoints Ontology](https://github.com/SciCrunch/TARA-Ontology-Repository/blob/master/ontology-files/generated/readme.md).
 
 ## Directory Structure
 
