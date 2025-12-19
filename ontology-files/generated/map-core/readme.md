@@ -23,7 +23,7 @@ Required Python packages:
 To install dependencies, run:
 
 ```bash
-pip install pip install pystardog[cloud]
+pip install pystardog[cloud]
 pip install python-dotenv
 ```
 
