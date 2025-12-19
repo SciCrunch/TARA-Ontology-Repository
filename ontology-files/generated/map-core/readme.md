@@ -8,7 +8,6 @@ This directory contains code, SPARQL queries, and generated data based on the qu
   - `query-acupoints-data.py`: Main script to run SPARQL queries against the Stardog database and save results as JSON.
   - `sparql-queries/`: Contains SPARQL query files for metadata and location extraction.
 - **data/**: Stores generated JSON files from query results.
-- **tara-acupoints-webprotege/**: Contains ontology files exported from WebProtege.
 - **map-core/**: This directory (overview, scripts, and generated data).
 
 ## Python Environment & Dependencies
