@@ -13,5 +13,5 @@
     "asserted": "http://purl.org/tara/ontology/kb/release/0.5/asserted/articles-kb.ttl",
     "inferred": "http://purl.org/tara/ontology/kb/release/0.5/inferred/articles-kb.ttl"
   },
-  "generated": "2026-09-09"
+  "generated": "2026-09-13"
 }

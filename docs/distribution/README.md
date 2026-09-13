@@ -7,30 +7,40 @@ Released Turtle files, served by GitHub Pages and resolvable via PURL. Written b
 ```
 distribution/
   index.html                         version index (both ontologies)
-  ontology/version/
-    latest.json                      { latest, versions[], versionIRIs{} }
-    <VERSION>/
-      asserted/acupoints.ttl         with BFO,  asserted axioms
-      inferred/acupoints.ttl         with BFO,  HermiT closure
-      no-bfo/asserted/acupoints.ttl  without BFO, asserted
-      no-bfo/inferred/acupoints.ttl  without BFO, HermiT closure   <- canonical
-  kb/version/
-    latest.json
-    <VERSION>/…/articles-kb.ttl      same four variants
+  ontology/
+    version/
+      latest.json                      { latest, versions[], versionIRIs{} }
+      <VERSION>/
+        asserted/acupoints.ttl         with BFO,  asserted axioms
+        inferred/acupoints.ttl         with BFO,  HermiT closure
+        no-bfo/asserted/acupoints.ttl  without BFO, asserted
+        no-bfo/inferred/acupoints.ttl  without BFO, HermiT closure   <- canonical
+    latest/                            mutable copy of the current version's
+      asserted/acupoints.ttl           4 variants - synced by
+      inferred/acupoints.ttl           publish_distribution.py on every run;
+      no-bfo/asserted/acupoints.ttl    never hand-edited, never a PURL retarget
+      no-bfo/inferred/acupoints.ttl
+  kb/
+    version/
+      latest.json
+      <VERSION>/…/articles-kb.ttl      same four variants
+    latest/…/articles-kb.ttl           same sync, same four variants
 ```
 
 A `<VERSION>/` folder is an **immutable snapshot** - once published it is never
 rewritten. Release versions come from `ontology-generator/script/versions.py`.
+`latest/` is the one mutable tree: `publish_distribution.py` overwrites its
+four files from the current `<VERSION>/` on every run (`--post-processing-only`
+does just this sync, skipping `latest.json`/`index.html`).
 
 ## Identifiers
 
-
-| kind                         | example                                                                   | resolves to                          |
-| ---------------------------- | ------------------------------------------------------------------------- | ------------------------------------ |
-| ontology IRI (always latest) | `http://purl.org/tara/ontology/acupoints.owl`                             | the current release's canonical file |
-| version IRI (pinned)         | `http://purl.org/tara/ontology/release/<V>/no-bfo/inferred/acupoints.ttl` | that exact snapshot                  |
-| KB ontology IRI              | `http://purl.org/tara/ontology/kb/articles-kb.ttl`                        | current KB release                   |
-| KB version IRI               | `http://purl.org/tara/ontology/kb/release/<V>/…/articles-kb.ttl`         | that snapshot                        |
+| kind                          | example                                                                    | resolves to                               |
+| ------------------------------ | --------------------------------------------------------------------------- | -------------------------------------------- |
+| ontology IRI (always latest)  | `http://purl.org/tara/ontology/acupoints.owl`                             | the current release's asserted (BFO) file |
+| version IRI (pinned)          | `http://purl.org/tara/ontology/release/<V>/no-bfo/inferred/acupoints.ttl` | that exact snapshot                       |
+| KB ontology IRI               | `http://purl.org/tara/ontology/kb/articles-kb.ttl`                        | current KB release                        |
+| KB version IRI                | `http://purl.org/tara/ontology/kb/release/<V>/…/articles-kb.ttl`         | that snapshot                             |
 
 Each `.ttl` carries its own `owl:versionIRI` matching the table above.
 
@@ -38,16 +48,19 @@ Each `.ttl` carries its own `owl:versionIRI` matching the table above.
 
 Partial redirects, most-specific wins:
 
+| pattern                             | type    | target                                                        |
+| ------------------------------------- | --------- | ----------------------------------------------------------------- |
+| `/tara/ontology/release/`           | partial | `…/TARA-Ontology-Repository/distribution/ontology/version/`   |
+| `/tara/ontology/kb/release/`        | partial | `…/TARA-Ontology-Repository/distribution/kb/version/`         |
+| `/tara/ontology/acupoints.owl`      | 302     | `…/distribution/ontology/latest/asserted/acupoints.ttl`       |
+| `/tara/ontology/kb/articles-kb.ttl` | 302     | `…/distribution/kb/latest/no-bfo/inferred/articles-kb.ttl`    |
+| `/tara/ontology/TARA_`              | partial | the ontology browser (term IRIs)                               |
 
-| pattern                             | type    | target                                                                     |
-| ----------------------------------- | ------- | -------------------------------------------------------------------------- |
-| `/tara/ontology/release/`           | partial | `…/TARA-Ontology-Repository/distribution/ontology/version/`               |
-| `/tara/ontology/kb/release/`        | partial | `…/TARA-Ontology-Repository/distribution/kb/version/`                     |
-| `/tara/ontology/acupoints.owl`      | 302     | `…/distribution/ontology/version/<CURRENT>/no-bfo/inferred/acupoints.ttl` |
-| `/tara/ontology/kb/articles-kb.ttl` | 302     | `…/distribution/kb/version/<CURRENT>/no-bfo/inferred/articles-kb.ttl`     |
-| `/tara/ontology/TARA_`              | partial | the ontology browser (term IRIs)                                           |
-
-The two 302s are the "always latest" links - retarget the `<CURRENT>` segment
-(one line each) when cutting a release. The `release/` -> `version/` path
-difference is handled by the partial redirect; the segments after the matched
-prefix are appended verbatim.
+The two 302s are the "always latest" links. Their targets point at `latest/`,
+not a version-numbered path, so they are a **one-time** PURL setup -
+`publish_distribution.py` keeps the bytes behind them current on every
+release; the PURL entries themselves are never retargeted again. (`latest/`
+is new - these two rows previously pointed at `version/<CURRENT>/…`, bumped
+by hand each release; that is no longer necessary.) The `release/` ->
+`version/` path difference is handled by the partial redirect; the segments
+after the matched prefix are appended verbatim.

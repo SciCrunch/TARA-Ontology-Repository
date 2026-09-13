@@ -7,27 +7,39 @@ The header-stamping scripts write the versioned Turtle files into
     docs/distribution/ontology/version/<VERSION>/<variant>/acupoints.ttl
     docs/distribution/kb/version/<VERSION>/<variant>/articles-kb.ttl
 
-This script, run last in the pipeline, does not touch those files; it only
-derives the "what's current / what exists" metadata from script/versions.py and
-whatever version folders are present:
+This script, run last in the pipeline, does not touch the version/<V>/ files
+themselves; it only derives the "what's current / what exists" metadata from
+script/versions.py and whatever version folders are present:
 
     docs/distribution/ontology/version/latest.json
     docs/distribution/kb/version/latest.json
     docs/distribution/index.html          (human-browsable version index)
 
-The version-less ontology IRIs
-(http://purl.org/tara/ontology/acupoints.owl, .../kb/articles-kb.ttl) are the
-"always latest" links; a PURL 302 points each at the current version's file -
-one target to bump per release. latest.json is the machine-readable equivalent.
+As a post-processing step it also syncs docs/distribution/<key>/latest/ - a
+mutable sibling of version/, holding a copy of the *current* version's four
+variant files (asserted / inferred / no-bfo/asserted / no-bfo/inferred). This
+is what a PURL should point at for a permanent, never-hand-edited "always
+latest" URL: the PURL target string never changes; this script is what keeps
+the bytes behind it current, each time it runs.
+
+    docs/distribution/ontology/latest/{asserted,inferred,no-bfo/...}/acupoints.ttl
+    docs/distribution/kb/latest/{asserted,inferred,no-bfo/...}/articles-kb.ttl
+
+Run with --post-processing-only to only sync latest/ (skip regenerating
+latest.json and index.html) - useful for backfilling latest/ against an
+already-published version without touching anything else. A plain run (no
+flag) does the full pipeline, including the latest/ sync.
 
 Author: Fahim Imam
 ================================================================================
 """
 
+import argparse
 import datetime
 import html
 import json
 import os
+import shutil
 import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -71,6 +83,10 @@ ONTOLOGIES = [
         "file": "acupoints.ttl",
         "iri_base": "http://purl.org/tara/ontology/release/",
         "ontology_iri": "http://purl.org/tara/ontology/acupoints.owl",
+        # the PURL for ontology_iri targets latest/asserted/ (BFO, no HermiT
+        # closure) - deliberately NOT the same file as CANONICAL_PATH below,
+        # so the two are called out separately wherever both are shown.
+        "iri_variant_label": "Asserted (BFO)",
     },
     {
         "key": "kb",
@@ -79,6 +95,9 @@ ONTOLOGIES = [
         "file": "articles-kb.ttl",
         "iri_base": "http://purl.org/tara/ontology/kb/release/",
         "ontology_iri": "http://purl.org/tara/ontology/kb/articles-kb.ttl",
+        # the KB's PURL targets latest/no-bfo/inferred/ - same file as
+        # CANONICAL_PATH, unlike the ontology entry above.
+        "iri_variant_label": CANONICAL_LABEL,
     },
 ]
 
@@ -102,6 +121,26 @@ def discover_versions(version_dir):
 
 def variant_url(iri_base, version, variant, file_name):
     return f"{iri_base}{version}/{variant}/{file_name}"
+
+
+def sync_latest(ont, current):
+    """Copy `current`'s four variant files into <key>/latest/, overwriting
+    whatever was there before. version/<current>/ is only ever read here,
+    never written - the immutable-snapshot guarantee is unaffected."""
+    version_dir = os.path.join(DIST_ROOT, ont["key"], "version", current)
+    latest_dir = os.path.join(DIST_ROOT, ont["key"], "latest")
+    synced = 0
+    for _label, path in VARIANTS:
+        parts = path.split("/")
+        src = os.path.join(version_dir, *parts, ont["file"])
+        dst = os.path.join(latest_dir, *parts, ont["file"])
+        if not os.path.isfile(src):
+            print(f"  WARNING: missing {os.path.relpath(src)} - skipping latest/{path}")
+            continue
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+        synced += 1
+    print(f"  synced {ont['key']}/latest/ ({synced}/{len(VARIANTS)} variants) from version {current}")
 
 
 def build_latest_json(ont, versions):
@@ -200,12 +239,14 @@ def section_html(ont, versions):
         f"<section>\n<h2>{e(ont['title'])}</h2>\n"
         f"<div class=\"latest\">Latest: <a href=\"{canon_href}\">{e(current)} "
         f"({e(CANONICAL_LABEL)})</a> &middot; ontology IRI "
-        f"<code>{e(ont['ontology_iri'])}</code></div>\n"
+        f"<code>{e(ont['ontology_iri'])}</code> "
+        f"&rarr; always resolves to the current release's "
+        f"<strong>{e(ont['iri_variant_label'])}</strong> file</div>\n"
         f"<table>\n{chr(10).join(rows)}\n</table>\n</section>\n"
     )
 
 
-def main():
+def main(post_processing_only=False):
     if not os.path.isdir(DIST_ROOT):
         raise SystemExit(f"Nothing to publish - {os.path.relpath(DIST_ROOT)} does not exist. "
                          f"Run the header-stamping scripts first.")
@@ -226,15 +267,17 @@ def main():
             print(f"  WARNING: script/versions.py says {ont['key']} is {ont['current']} "
                   f"but that folder is missing (found: {', '.join(versions)})")
 
-        latest_path = os.path.join(version_dir, "latest.json")
-        with open(latest_path, "w", encoding="utf-8") as fh:
-            json.dump(build_latest_json(ont, versions), fh, indent=2)
-            fh.write("\n")
-        print(f"  wrote {os.path.relpath(latest_path)}  (latest={ont['current']}, versions={', '.join(versions)})")
+        if not post_processing_only:
+            latest_path = os.path.join(version_dir, "latest.json")
+            with open(latest_path, "w", encoding="utf-8") as fh:
+                json.dump(build_latest_json(ont, versions), fh, indent=2)
+                fh.write("\n")
+            print(f"  wrote {os.path.relpath(latest_path)}  (latest={ont['current']}, versions={', '.join(versions)})")
+            sections.append(section_html(ont, versions))
 
-        sections.append(section_html(ont, versions))
+        sync_latest(ont, ont["current"])
 
-    if sections:
+    if not post_processing_only and sections:
         index_path = os.path.join(DIST_ROOT, "index.html")
         with open(index_path, "w", encoding="utf-8") as fh:
             fh.write(build_index_html("".join(sections)))
@@ -244,4 +287,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Refresh the distribution version index.")
+    parser.add_argument(
+        "--post-processing-only", action="store_true",
+        help="Only sync ontology/latest and kb/latest from each ontology's current "
+             "version folder; skip regenerating latest.json and index.html.",
+    )
+    args = parser.parse_args()
+    main(post_processing_only=args.post_processing_only)
